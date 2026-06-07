@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function friendPath(ownerUid, friendUid) {
+      return /databases/$(database)/documents/users/$(ownerUid)/friends/$(friendUid);
+    }
+
+    function acceptedFriends(a, b) {
+      return signedIn()
+        && exists(friendPath(a, b))
+        && exists(friendPath(b, a))
+        && get(friendPath(a, b)).data.status == "accepted"
+        && get(friendPath(b, a)).data.status == "accepted";
+    }
+
+    function safeUserProfile() {
+      return request.resource.data.keys().hasOnly([
+        "displayName",
+        "username",
+        "usernameLower",
+        "avatarUrl",
+        "bio",
+        "globalLocationSharing",
+        "batteryPercent",
+        "batteryStatus",
+        "batteryUpdatedAt",
+        "lastActiveAt",
+        "fcmTokens",
+        "createdAt",
+        "updatedAt"
+      ]);
+    }
+
+    match /usernames/{username} {
+      allow get: if signedIn();
+      allow list, create, update, delete: if false;
+    }
+
+    match /users/{userId} {
+      // Public/search/friend profile fields are returned through Cloud Functions to avoid
+      // exposing private user fields such as FCM tokens or notification settings.
+      allow get: if isSelf(userId);
+      allow list: if false;
+      allow create: if isSelf(userId) && safeUserProfile();
+      allow update: if isSelf(userId) && safeUserProfile();
+      allow delete: if false;
+
+      match /friends/{friendId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSelf(userId);
+        allow update: if isSelf(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["read"]);
+        allow create, delete: if false;
+      }
+
+      match /visitedPlaces/{placeId} {
+        allow read: if isSelf(userId);
+        allow write: if false;
+      }
+    }
+
+    match /liveLocations/{userId} {
+      // Friend locations are served by getHomeMapFeed so Ghost Mode can be applied server-side.
+      allow get: if isSelf(userId);
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    match /interactions/{pairId}/messages/{messageId} {
+      allow read: if signedIn()
+        && (request.auth.uid == resource.data.fromUid || request.auth.uid == resource.data.toUid);
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
