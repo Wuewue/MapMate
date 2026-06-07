@@ -1,0 +1,24 @@
+{
+  "name": "mapmate-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "serve": "npm run build && cd ../.. && firebase emulators:start --only functions,firestore,storage --project mapmate-69a2e",
+    "deploy": "npm run build && cd ../.. && firebase deploy --only functions,firestore:rules,storage:rules --project mapmate-69a2e"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.0.1",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/nodemailer": "^6.4.17",
+    "typescript": "^5.7.3"
+  }
+}
